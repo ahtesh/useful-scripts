@@ -1,0 +1,41 @@
+Let us say, you have files generated from Azure DevOps build pipelines. The generated files can be put into a folder, before zipping these files. The script is already there and please find below the explanation of the powershell script.
+
+***************************************************************************************
+
+$sourceFolder = "$(Agent.BuildDirectory)\$(Build.DefinitionName)\$(Build.BuildNumber)\b"
+This line sets the $sourceFolder variable to the path where your build artifacts are located. It uses predefined variables in Azure DevOps to dynamically construct the path based on the build directory, build definition name, and build number.
+
+$zipFileName = "MyBinaryFiles.zip"
+This line sets the name of the zip file that will be created.
+
+$7ZipExe = "${env:ProgramFiles(x86)}\7-Zip\7z.exe"
+if (-Not (Test-Path $7ZipExe)) {
+    Write-Host "7-Zip executable not found. Please make sure 7-Zip is installed."
+    exit 1
+}
+Here, the script sets the path to the 7-Zip executable. It uses an environment variable (${env:ProgramFiles(x86)}) to find the location of the Program Files (x86) directory, which is where 32-bit applications are usually installed on 64-bit Windows systems. The script then checks if the 7-Zip executable exists. If it doesn't, it displays an error message and exits with an error code.
+
+$filesToZip = @("a.bin", "c.hex")
+This line specifies an array of file names that you want to include in the zip archive.
+$prodFolder = Join-Path -Path $sourceFolder -ChildPath "Prod"
+New-Item -Path $prodFolder -ItemType Directory -Force
+These lines create a "Prod" subfolder within the source folder. The Join-Path cmdlet is used to concatenate the source folder path with the "Prod" subfolder name. The New-Item cmdlet is then used to create the directory if it doesn't already exist.
+
+$filesToZip | ForEach-Object {
+    $sourceFile = Join-Path -Path $sourceFolder -ChildPath $_
+    $destinationFile = Join-Path -Path $prodFolder -ChildPath $_
+    Move-Item -Path $sourceFile -Destination $destinationFile -Force
+}
+These lines iterate through the $filesToZip array. For each file, they construct the source and destination paths using Join-Path, and then use Move-Item to move the files from the source folder to the "Prod" subfolder.
+
+& $7ZipExe a -tzip "$sourceFolder\$zipFileName" "$prodFolder\*"
+or this line can be written as
+& $7ZipExe a -tzip "$sourceFolder\$zipFileName" "$sourceFolder\*"
+
+This line uses the 7-Zip executable to create a zip archive. The -tzip flag specifies the archive type as ZIP. The source path is the "Prod" subfolder, and the destination path is the location where the zip file will be created. The above 2 options can be used, based on the preference, how you want to zip the folder, that is on what level of folder, zip is needed.
+
+Remove-Item -Path $prodFolder -Recurse -Force
+After the files are zipped, this line removes the "Prod" subfolder and its contents using the Remove-Item cmdlet. The -Recurse flag is used to delete all files and subfolders within the "Prod" subfolder.
+The script handles the entire process of creating the "Prod" folder, moving files into it, zipping the folder, and then removing the "Prod" folder.
+
+***************************************************************************************
